@@ -1,29 +1,22 @@
 # python-etl-framework
 
-Framework ETL Python para pipelines de datos en producción. Patrón Extractor → Transformer → Loader con chunking, manejo de errores, watermarks incrementales y métricas de ejecución.
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-## Componentes
+A modular ETL framework for production data pipelines in Python. Follows the Extractor -> Transformer -> Loader pattern with chunked processing, error handling, incremental watermarks, and execution metrics.
 
-**Extractors** — `etl/extractors/`
-- `CsvExtractor` — CSV locales o directorios completos, soporta gzip
-- `InMemoryCsvExtractor` — CSV desde string (webhooks, tests)
-- `SqliteExtractor` — SQLite con paginación automática y parámetros
-- `SqliteIncrementalExtractor` — Extracción incremental con watermark persistente
+## Features
 
-**Transformers** — `etl/transformers/`
-- `ColumnMapper` — renombrar, filtrar, defaults
-- `TypeCaster` — casteo de tipos con manejo de errores
-- `DuplicateFilter` — deduplicación por clave
-- `NullFilter` — eliminar registros con campos obligatorios vacíos
-- `ValueNormalizer` — normalización de texto
-- `ComputedColumns` — columnas calculadas con lambdas
-- `ChainTransformer` — encadena múltiples transformers
+- **Pluggable architecture** -- each pipeline is composed of independent extractor, transformer, and loader components
+- **Chunked processing** -- streams data in configurable chunks, never loading the full dataset into memory
+- **Incremental extraction** -- built-in watermark persistence for delta loads from SQLite sources
+- **Graceful error handling** -- configurable `fail_fast` mode; per-chunk error recovery with partial success reporting
+- **Rich transformers** -- rename, type-cast, deduplicate, filter nulls, normalize text, compute columns, or chain any combination
+- **Batch loading** -- micro-batch inserts with upsert (INSERT OR REPLACE / INSERT OR IGNORE) support
+- **Execution metrics** -- each run returns a `RunResult` with extracted/loaded/failed counts and duration
+- **Docker support** -- ready-to-use container image for scheduled pipelines
 
-**Loaders** — `etl/loaders/`
-- `SqliteLoader` — INSERT / INSERT OR REPLACE / INSERT OR IGNORE con batch
-- `CsvFileLoader` — escritura CSV con modo overwrite/append
-
-## Uso
+## Quick Start
 
 ```python
 from etl.core.base import ChainTransformer, Pipeline
@@ -48,14 +41,58 @@ result = pipeline.run()
 print(result)  # [orders_etl] SUCCESS | extracted=12400 loaded=12380 failed=20 duration=3.2s
 ```
 
-## Tests
+## Project Structure
+
+```
+python-etl-framework/
+├── etl/
+│   ├── core/            # Base classes: Pipeline, Extractor, Transformer, Loader, RunResult
+│   ├── extractors/      # CsvExtractor, InMemoryCsvExtractor, SqliteExtractor, SqliteIncrementalExtractor
+│   ├── transformers/    # ColumnMapper, TypeCaster, DuplicateFilter, NullFilter, ValueNormalizer, ComputedColumns
+│   └── loaders/         # SqliteLoader, CsvFileLoader
+├── pipelines/           # Ready-to-run pipeline examples (e.g. sales_pipeline)
+├── tests/               # Unit and integration tests
+├── Dockerfile           # Production container (python:3.11-slim)
+├── Makefile             # test, lint, format, clean targets
+└── pyproject.toml       # Ruff configuration
+```
+
+### Components
+
+| Layer | Component | Description |
+|---|---|---|
+| **Extractors** | `CsvExtractor` | Reads CSV files or directories (supports gzip, custom delimiters) |
+| | `InMemoryCsvExtractor` | Reads CSV from a string (webhooks, tests) |
+| | `SqliteExtractor` | Paginated SQLite queries with parameter binding |
+| | `SqliteIncrementalExtractor` | Delta extraction with persistent watermarks |
+| **Transformers** | `ColumnMapper` | Rename, keep/drop columns, set defaults |
+| | `TypeCaster` | Type coercion (int, float, bool, datetime, str) with error handling |
+| | `DuplicateFilter` | Deduplication by key columns |
+| | `NullFilter` | Remove records with empty required fields |
+| | `ValueNormalizer` | Text normalization (lower/upper, strip, replacements) |
+| | `ComputedColumns` | Lambda-based computed columns |
+| | `ChainTransformer` | Sequentially apply multiple transformers |
+| **Loaders** | `SqliteLoader` | INSERT / INSERT OR REPLACE / INSERT OR IGNORE with configurable batch size |
+| | `CsvFileLoader` | CSV output with overwrite or append mode |
+
+## Development
 
 ```bash
+# Run tests
 python -m unittest tests.test_etl -v
-```
 
-## Pipeline de ejemplo
+# Lint and format
+make lint
+make format
 
-```bash
+# Run the example pipeline
 python -m pipelines.sales_pipeline --source data/raw/sales/ --db data/warehouse.db
+
+# Docker
+docker build -t python-etl-framework .
+docker run python-etl-framework
 ```
+
+## License
+
+MIT
